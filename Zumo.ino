@@ -18,6 +18,8 @@ Zumo32U4ButtonA buttonA;
 // Maximum motor speed
 const int MAX_SPEED = 100;
 
+int previousCorrection = 0;
+
 // PID control
 int lastError = 0;
 
@@ -77,39 +79,39 @@ void setup()
 
 
 
+
 void loop()
 {
   int position = lineSensors.readLine(sensors);
 
+  // Calculate line error
   int error = position - 2000;
 
-  // Smooth PD control
-  int P = error / 8;
-  int D = (error - lastError) / 15;
+  // Gentle PD controller
+  int P = error / 12;
+  int D = (error - lastError) / 25;
 
-  int speedDifference = P + D;
+  int correction = P + D;
 
   lastError = error;
 
-  // Reduce speed when turning
-  int baseSpeed = 85;
+  // Smooth steering changes
+  correction = (previousCorrection * 3 + correction) / 4;
 
-  if (abs(error) > 1000)
-  {
-    baseSpeed = 65;
-  }
+  previousCorrection = correction;
 
-  if (abs(error) > 1600)
-  {
-    baseSpeed = 50;
-  }
+  // Slower base speed for thin tape
+  int baseSpeed = 65;
 
-  int leftSpeed = baseSpeed + speedDifference;
-  int rightSpeed = baseSpeed - speedDifference;
+  // Motor speeds
+  int leftSpeed = baseSpeed + correction;
+  int rightSpeed = baseSpeed - correction;
 
+  // Limit speeds
   leftSpeed = constrain(leftSpeed, 0, 100);
   rightSpeed = constrain(rightSpeed, 0, 100);
 
   motors.setSpeeds(leftSpeed, rightSpeed);
 }
+
 
