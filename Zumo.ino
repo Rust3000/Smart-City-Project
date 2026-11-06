@@ -76,48 +76,40 @@ void setup()
 
 
 
+
 void loop()
 {
-  // Read line position
   int position = lineSensors.readLine(sensors);
 
-  // Calculate error from centre
   int error = position - 2000;
 
-  // PD controller
+  // Smooth PD control
   int P = error / 8;
-  int D = (error - lastError) / 12;
+  int D = (error - lastError) / 15;
 
   int speedDifference = P + D;
 
   lastError = error;
 
-  // Slow down when turning
-  int baseSpeed = MAX_SPEED;
+  // Reduce speed when turning
+  int baseSpeed = 85;
 
-  int absError = abs(error);
-
-  if (absError > 1200)
+  if (abs(error) > 1000)
   {
-    baseSpeed = 55;
-  }
-  else if (absError > 600)
-  {
-    baseSpeed = 75;
-  }
-  else
-  {
-    baseSpeed = 100;
+    baseSpeed = 65;
   }
 
-  // Calculate motor speeds
+  if (abs(error) > 1600)
+  {
+    baseSpeed = 50;
+  }
+
   int leftSpeed = baseSpeed + speedDifference;
   int rightSpeed = baseSpeed - speedDifference;
 
-  // Limit motor speeds
-  leftSpeed = constrain(leftSpeed, 0, MAX_SPEED);
-  rightSpeed = constrain(rightSpeed, 0, MAX_SPEED);
+  leftSpeed = constrain(leftSpeed, 0, 100);
+  rightSpeed = constrain(rightSpeed, 0, 100);
 
-  // Drive motors
   motors.setSpeeds(leftSpeed, rightSpeed);
 }
+
