@@ -4,6 +4,9 @@
  *
  * Follows a black line on a white background.
  * Uses proportional and derivative (PD) control.
+ *
+ * Stops when an object is detected in front
+ * using the built-in IR proximity sensors.
  */
 
 #include <Wire.h>
@@ -14,13 +17,15 @@ Zumo32U4Buzzer buzzer;
 Zumo32U4LineSensors lineSensors;
 Zumo32U4Motors motors;
 Zumo32U4ButtonA buttonA;
+Zumo32U4ProximitySensors proxSensors;
 
 // Maximum motor speed
 const int MAX_SPEED = 100;
 
-int previousCorrection = 0;
+// Proximity detection threshold
+const int OBJECT_THRESHOLD = 2;
 
-// PID control
+int previousCorrection = 0;
 int lastError = 0;
 
 // Five line sensors
@@ -28,21 +33,36 @@ int lastError = 0;
 unsigned int sensors[NUM_SENSORS];
 
 
+// Check for an object in front
+bool objectDetected()
+{
+  proxSensors.read();
+
+  // Read front proximity sensors only
+  int left = proxSensors.countsFrontWithLeftLeds();
+  int right = proxSensors.countsFrontWithRightLeds();
+
+  int detection = left + right;
+
+  return detection >= OBJECT_THRESHOLD;
+}
+
+
 void setup()
 {
   // Welcome sound
   buzzer.play(">g32>>c32");
 
-  // Initialize the five line sensors
+  // Initialize line sensors
   lineSensors.initFiveSensors();
+
+  // Initialize front proximity sensors
+  proxSensors.initFrontSensor();
 
   // Wait for button A
   buttonA.waitForButton();
 
   // Calibration
-  // Rotate the robot to let the sensors see
-  // both the black line and white background.
-
   delay(1000);
 
   for (int i = 0; i < 120; i++)
@@ -77,17 +97,23 @@ void setup()
 }
 
 
-
-
-
 void loop()
 {
+  // Check for an object in front
+  if (objectDetected())
+  {
+    // Stop both motors
+    motors.setSpeeds(0, 0);
+    return;
+  }
+
+  // Read line sensors
   int position = lineSensors.readLine(sensors);
 
   // Calculate line error
   int error = position - 2000;
 
-  // Gentle PD controller
+  // PD controller
   int P = error / 12;
   int D = (error - lastError) / 25;
 
@@ -100,18 +126,17 @@ void loop()
 
   previousCorrection = correction;
 
-  // Slower base speed for thin tape
+  // Base speed
   int baseSpeed = 65;
 
-  // Motor speeds
+  // Calculate motor speeds
   int leftSpeed = baseSpeed + correction;
   int rightSpeed = baseSpeed - correction;
 
-  // Limit speeds
-  leftSpeed = constrain(leftSpeed, 0, 100);
-  rightSpeed = constrain(rightSpeed, 0, 100);
+  // Limit motor speeds
+  leftSpeed = constrain(leftSpeed, 0, MAX_SPEED);
+  rightSpeed = constrain(rightSpeed, 0, MAX_SPEED);
 
+  // Set motor speeds
   motors.setSpeeds(leftSpeed, rightSpeed);
 }
-
-
