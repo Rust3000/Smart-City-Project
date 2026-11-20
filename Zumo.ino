@@ -1,70 +1,55 @@
 
-/*
- * Line follower for Pololu Zumo 32U4
- *
- * Follows a black line on a white background.
- * Uses proportional and derivative (PD) control.
- *
- * Stops when an object is detected in front
- * using the built-in IR proximity sensors.
- */
-
 #include <Wire.h>
 #include <Zumo32U4.h>
 
-// Zumo 32U4 hardware
 Zumo32U4Buzzer buzzer;
 Zumo32U4LineSensors lineSensors;
 Zumo32U4Motors motors;
 Zumo32U4ButtonA buttonA;
 Zumo32U4ProximitySensors proxSensors;
 
-// Maximum motor speed
 const int MAX_SPEED = 100;
-
-// Proximity detection threshold
 const int OBJECT_THRESHOLD = 12;
+
+#define NUM_SENSORS 5
+unsigned int sensors[NUM_SENSORS];
 
 int previousCorrection = 0;
 int lastError = 0;
 
-// Five line sensors
-#define NUM_SENSORS 5
-unsigned int sensors[NUM_SENSORS];
-
+bool robotRunning = false;
 
 // Check for an object in front
 bool objectDetected()
 {
   proxSensors.read();
 
-  // Read front proximity sensors only
   int left = proxSensors.countsFrontWithLeftLeds();
   int right = proxSensors.countsFrontWithRightLeds();
 
-  int detection = left + right;
-
-  return detection >= OBJECT_THRESHOLD;
+  return (left + right) >= OBJECT_THRESHOLD;
 }
 
+void stopRobot()
+{
+  motors.setSpeeds(0, 0);
+  previousCorrection = 0;
+  lastError = 0;
+}
 
 void setup()
 {
-  // Welcome sound
   buzzer.play(">g32>>c32");
 
-  // Initialize line sensors
   lineSensors.initFiveSensors();
-
-  // Initialize front proximity sensors
   proxSensors.initFrontSensor();
 
-  // Wait for button A
+  // Wait for button A before calibration
   buttonA.waitForButton();
 
-  // Calibration
   delay(1000);
 
+  // Calibrate line sensors
   for (int i = 0; i < 120; i++)
   {
     if (i > 30 && i <= 90)
@@ -79,28 +64,52 @@ void setup()
     lineSensors.calibrate();
   }
 
-  // Stop after calibration
-  motors.setSpeeds(0, 0);
+  stopRobot();
 
-  // Calibration complete
   buzzer.play(">g32>>c32");
 
-  // Wait for button A again
-  buttonA.waitForButton();
-
+  // Wait for calibration sound to finish
   while (buzzer.isPlaying())
   {
   }
-}
 
+  // Robot starts in OFF mode
+  robotRunning = false;
+}
 
 void loop()
 {
+  // Check if button A has been pressed
+  if (buttonA.getSingleDebouncedPress())
+  {
+    robotRunning = !robotRunning;
+
+    if (robotRunning)
+    {
+      // Reset controller when starting
+      previousCorrection = 0;
+      lastError = 0;
+
+      buzzer.play(">c32");
+    }
+    else
+    {
+      stopRobot();
+      buzzer.play(">g32");
+    }
+  }
+
+  // If robot is OFF, keep motors stopped
+  if (!robotRunning)
+  {
+    stopRobot();
+    return;
+  }
+
   // Check for an object in front
   if (objectDetected())
   {
-    // Stop both motors
-    motors.setSpeeds(0, 0);
+    stopRobot();
     return;
   }
 
@@ -120,7 +129,6 @@ void loop()
 
   // Smooth steering changes
   correction = (previousCorrection * 3 + correction) / 4;
-
   previousCorrection = correction;
 
   // Base speed
@@ -134,6 +142,5 @@ void loop()
   leftSpeed = constrain(leftSpeed, 0, MAX_SPEED);
   rightSpeed = constrain(rightSpeed, 0, MAX_SPEED);
 
-  // Set motor speeds
   motors.setSpeeds(leftSpeed, rightSpeed);
 }
