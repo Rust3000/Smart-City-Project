@@ -23,7 +23,7 @@ Zumo32U4ProximitySensors proxSensors;
 const int MAX_SPEED = 100;
 
 // Proximity detection threshold
-const int OBJECT_THRESHOLD = 2;
+const int OBJECT_THRESHOLD = 12;
 
 int previousCorrection = 0;
 int lastError = 0;
@@ -87,9 +87,6 @@ void setup()
 
   // Wait for button A again
   buttonA.waitForButton();
-
-  // Start music
-  buzzer.play("L16 cdegreg4");
 
   while (buzzer.isPlaying())
   {
